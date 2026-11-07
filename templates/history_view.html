@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}History — {{ matric_no }} — YABATECH Performance Predictor{% endblock %}
+{% block page_title %}History for {{ matric_no }}{% endblock %}
+{% block page_subtitle %}
+  <p class="subtitle"><a href="{{ url_for('history_lookup') }}">&larr; Look up a different matric number</a></p>
+{% endblock %}
+{% block content %}
+  {% set classification_class = {
+      "Fail": "badge-risk",
+      "Pass": "badge-average",
+      "Lower Credit": "badge-average",
+      "Upper Credit": "badge-good",
+      "Distinction": "badge-excellent"
+  } %}
+
+  {% if not entries %}
+    <div class="history-empty">
+      <p>No saved results yet for <strong>{{ matric_no }}</strong>.</p>
+      <p class="muted">Check a score on the <a href="{{ url_for('quick_check') }}">Check My Score</a> page and tick
+         "save to history" with this matric number to start a trend.</p>
+    </div>
+  {% else %}
+    <div class="trend-card">
+      <h3>Predicted score over time</h3>
+      <p class="trend-sub">{{ entries|length }} saved check{{ 's' if entries|length != 1 }}.</p>
+
+      {% if trend %}
+        <svg viewBox="0 0 {{ trend.width }} {{ trend.height }}" width="100%">
+          <defs>
+            <linearGradient id="trendLineGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#16a34a"/>
+              <stop offset="100%" stop-color="#4ade80"/>
+            </linearGradient>
+            <linearGradient id="trendAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#4ade80" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+
+          {% for gridline in [0, 25, 50, 75, 100] %}
+            {% set gy = trend.baseline_y - (gridline / 100 * (trend.baseline_y - 18)) %}
+            <line class="grid-line" x1="20" y1="{{ gy }}" x2="{{ trend.width - 4 }}" y2="{{ gy }}" stroke-width="1"/>
+            <text x="2" y="{{ gy + 3 }}" font-size="9">{{ gridline }}</text>
+          {% endfor %}
+
+          {% if trend.area_path %}<path class="trend-area" d="{{ trend.area_path }}"/>{% endif %}
+          {% if trend.line_path %}<path class="trend-line" d="{{ trend.line_path }}"/>{% endif %}
+
+          {% for p in trend.points %}
+            <circle class="{{ 'trend-point-latest' if loop.last else 'trend-point' }}" cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ 5 if loop.last else 3.5 }}">
+              <title>{{ p.date }}: {{ p.score }}</title>
+            </circle>
+          {% endfor %}
+        </svg>
+      {% endif %}
+    </div>
+
+    <div class="results-panel">
+      <div class="results-panel-head"><h3>Saved entries</h3></div>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Saved</th>
+              <th>Exam</th>
+              <th>Test</th>
+              <th>Assignment</th>
+              <th>Practical</th>
+              <th>Score</th>
+              <th>Classification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in entries|reverse %}
+              <tr>
+                <td class="muted small">{{ e.saved_at[:10] }}</td>
+                <td class="tabular">{{ e.exam_score }}</td>
+                <td class="tabular">{{ e.test_score }}</td>
+                <td class="tabular">{{ e.assignment_score }}</td>
+                <td class="tabular">{{ e.practical_score }}</td>
+                <td class="tabular">{{ e.predicted_score }}</td>
+                <td><span class="badge {{ classification_class.get(e.classification, '') }}">{{ e.classification }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="history-actions">
+      <form method="post" action="{{ url_for('history_delete') }}"
+            onsubmit="return confirm('Delete all saved history for {{ matric_no }}? This cannot be undone.');">
+        <input type="hidden" name="matric_no" value="{{ matric_no }}">
+        <input type="hidden" name="pin" value="{{ pin }}">
+        <button type="submit" class="btn-secondary">Delete this history</button>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}

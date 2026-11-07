@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Batch Upload — YABATECH Performance Predictor{% endblock %}
+{% block page_title %}Upload a class roster{% endblock %}
+{% block page_subtitle %}
+  <p class="subtitle">
+    One row per student, the usual way a class list already exists — as a spreadsheet.
+    Every row is scored in one pass: predicted score, ND/HND-style classification, and a
+    counsellor's note per student, plus a class-wide risk breakdown.
+  </p>
+{% endblock %}
+{% block content %}
+  <a class="student-callout" href="{{ url_for('quick_check') }}">
+    <span class="student-callout-text">
+      <strong>Are you a student?</strong> Check your own predicted score in under a minute — no spreadsheet needed.
+    </span>
+    <span class="student-callout-arrow">&rarr;</span>
+  </a>
+
+  <form id="upload-form" class="upload-form">
+    <label class="dropzone" id="dropzone" for="roster-file">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0-11l-4 4m4-4l4 4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="dropzone-title">Click to choose a .csv or .xlsx file</span>
+      <span class="dropzone-sub" id="dropzone-filename">No file selected</span>
+      <input type="file" id="roster-file" name="roster" accept=".csv,.xlsx,.xlsm" hidden>
+    </label>
+    <div class="upload-actions">
+      <button type="submit" class="btn-primary" id="submit-btn" disabled>Scan &amp; predict</button>
+      <button type="button" class="btn-secondary" id="example-btn">Try an example roster</button>
+      <a class="btn-link" href="{{ url_for('batch_template') }}">Download CSV template</a>
+    </div>
+    <p class="privacy-note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+      Uploaded rosters are processed in memory for this request only and are not saved anywhere —
+      close or refresh this page and the results are gone unless you download them below.
+    </p>
+  </form>
+
+  <div id="scanner" class="scanner" hidden aria-live="polite">
+    <div class="scan-doc">
+      <div class="scan-beam"></div>
+      {% for i in range(8) %}<div class="scan-row"></div>{% endfor %}
+    </div>
+    <p class="scan-status" id="scan-status">Reading rows&hellip;</p>
+  </div>
+
+  <div id="results">
+    <div class="empty-state">
+      <p>Your class report will appear here once a roster is scanned.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById("upload-form");
+  const fileInput = document.getElementById("roster-file");
+  const dropzone = document.getElementById("dropzone");
+  const filenameEl = document.getElementById("dropzone-filename");
+  const submitBtn = document.getElementById("submit-btn");
+  const scanner = document.getElementById("scanner");
+  const statusEl = document.getElementById("scan-status");
+  const resultsEl = document.getElementById("results");
+  const exampleBtn = document.getElementById("example-btn");
+
+  const PHRASES = [
+    "Reading rows…",
+    "Scoring students…",
+    "Weighing exam, test, assignment & practical scores…",
+    "Compiling class report…",
+  ];
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    filenameEl.textContent = file ? file.name : "No file selected";
+    submitBtn.disabled = !file;
+  });
+
+  async function submitFile(file) {
+    const formData = new FormData();
+    formData.append("roster", file, file.name);
+
+    scanner.hidden = false;
+    resultsEl.classList.add("results-loading");
+    let phraseIdx = 0;
+    statusEl.textContent = PHRASES[0];
+    const timer = setInterval(() => {
+      phraseIdx = (phraseIdx + 1) % PHRASES.length;
+      statusEl.textContent = PHRASES[phraseIdx];
+    }, 650);
+
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 1100));
+    let html;
+    try {
+      const [response] = await Promise.all([
+        fetch("{{ url_for('batch_predict') }}", { method: "POST", body: formData }),
+        minDelay,
+      ]);
+      html = await response.text();
+    } catch (err) {
+      html = '<div class="batch-error"><p>Upload failed: ' + String(err) + "</p></div>";
+    }
+
+    clearInterval(timer);
+    scanner.hidden = true;
+    resultsEl.classList.remove("results-loading");
+    resultsEl.innerHTML = html;
+    resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const file = fileInput.files[0];
+    if (file) submitFile(file);
+  });
+
+  exampleBtn.addEventListener("click", async () => {
+    const res = await fetch("{{ url_for('batch_template') }}");
+    const blob = await res.blob();
+    submitFile(new File([blob], "yabatech_roster_template.csv", { type: "text/csv" }));
+  });
+
+  // CSV export: reads the visible results table straight out of the DOM
+  // and builds the file client-side — no server round trip, and nothing
+  // the server needs to have kept around from the upload.
+  function csvCell(text) {
+    const s = String(text ?? "");
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  resultsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("#export-csv-btn");
+    if (!btn) return;
+
+    const table = resultsEl.querySelector(".results-table");
+    if (!table) return;
+
+    const rows = [];
+    const headerCells = Array.from(table.querySelectorAll("thead th")).map((th) => th.textContent.trim());
+    rows.push(headerCells);
+
+    table.querySelectorAll("tbody tr").forEach((tr) => {
+      const cells = Array.from(tr.querySelectorAll("td")).map((td) => td.textContent.trim().replace(/\s+/g, " "));
+      rows.push(cells);
+    });
+
+    const csv = rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "class_report.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+{% endblock %}

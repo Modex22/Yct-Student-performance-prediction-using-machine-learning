@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}History — YABATECH Performance Predictor{% endblock %}
+{% block page_title %}Saved score history{% endblock %}
+{% block page_subtitle %}
+  <p class="subtitle">
+    Look up saved results for a matric number using the PIN set when it was first saved.
+    Nothing is saved automatically — this only shows entries someone explicitly chose to save
+    from the <a href="{{ url_for('quick_check') }}">Check My Score</a> page.
+  </p>
+{% endblock %}
+{% block content %}
+  <form method="post" action="{{ url_for('history_lookup_submit') }}" class="history-lookup">
+    <div class="form-field">
+      <label for="matric_no">Matric number</label>
+      <input type="text" id="matric_no" name="matric_no" placeholder="e.g. ND/CS/23/0142" required>
+    </div>
+    <div class="form-field">
+      <label for="pin">PIN</label>
+      <input type="password" id="pin" name="pin" placeholder="Set when first saved" minlength="4" required autocomplete="off">
+    </div>
+    <button type="submit" class="btn-primary">View history</button>
+  </form>
+
+  {% if notice %}
+    <div class="disclaimer" style="background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-strong);">{{ notice }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="disclaimer">{{ error }}</div>
+  {% endif %}
+{% endblock %}

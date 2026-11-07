@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Model training — YABATECH Predictor{% endblock %}
+{% block page_title %}Semester model training{% endblock %}
+{% block page_subtitle %}<p class="subtitle">Upload paired historical results and train the first-to-second-semester model.</p>{% endblock %}
+{% block topbar_extra %}<a class="btn-secondary" href="{{ url_for('logout') }}">Log out</a>{% endblock %}
+{% block content %}
+<section class="panel data-panel">
+ <span class="eyebrow">ADMIN ONLY</span><h2>Upload historical training data</h2>
+ <p class="subtitle">Each row must represent one student in one course, with both first- and second-semester scores. Scores must be between 0 and 100.</p>
+ {% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
+ {% with messages = get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<p class="alert">{{ message }}</p>{% endfor %}{% endwith %}
+ <p><a class="btn-secondary" href="{{ url_for('admin_training_template') }}">Download CSV template</a></p>
+ <form method="post" enctype="multipart/form-data" class="predict-form">
+  <div class="form-field"><label for="training_file">Training dataset (.csv or .xlsx)</label><input id="training_file" type="file" name="training_file" accept=".csv,.xlsx,.xlsm" required></div>
+  <button class="btn-primary" type="submit">Validate data &amp; train model</button>
+ </form>
+</section>
+<section class="panel data-panel"><h2>Required CSV columns</h2>
+ <div class="table-wrap"><table><thead><tr><th>Column</th><th>Meaning</th><th>Example</th></tr></thead><tbody>
+ <tr><td>student_id</td><td>Consistent anonymous student identifier</td><td>STU001</td></tr>
+ <tr><td>course</td><td>Course code</td><td>SWD 321</td></tr>
+ <tr><td>first_semester_score</td><td>First-semester course score</td><td>75</td></tr>
+ <tr><td>second_semester_score</td><td>Actual second-semester score (training target)</td><td>81</td></tr>
+ </tbody></table></div>
+ <p class="subtitle">At least 10 distinct students are required. The test split keeps all rows from a student together to reduce data leakage. Do not upload names or other personal details unless genuinely needed.</p>
+</section>
+{% if metrics or saved_metrics %}{% set m = metrics or saved_metrics %}
+<section class="panel data-panel"><span class="eyebrow">LATEST TRAINING RESULT</span><h2>Model evaluation</h2>
+ <div class="stats-grid"><div class="stat-card"><span>Paired records</span><strong>{{ m.rows }}</strong></div><div class="stat-card"><span>Students</span><strong>{{ m.students }}</strong></div><div class="stat-card"><span>Courses</span><strong>{{ m.courses }}</strong></div><div class="stat-card"><span>Selected model</span><strong style="font-size:1.3rem">{{ m.best_model }}</strong></div></div>
+ <div class="table-wrap"><table><thead><tr><th>Model</th><th>MAE (points)</th><th>RMSE</th><th>R²</th></tr></thead><tbody>{% for name,result in m.models.items() %}<tr><td>{{ name }}</td><td>{{ result.mae }}</td><td>{{ result.rmse }}</td><td>{{ result.r2 if result.r2 is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+ <p class="subtitle">Evaluation uses a held-out group of students. The saved model is trained on all uploaded paired rows after evaluation. MAE is the average absolute score error; lower is better.</p>
+</section>{% endif %}
+<section class="notice-panel"><strong>Important limitation</strong><p>This uploads and trains a separate semester-transition model. It does not replace the existing demonstration predictor or automatically activate second-semester predictions in the student portal. That requires a separate integration step and validation with real YABATECH records.</p></section>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Result — YABATECH Performance Predictor{% endblock %}
+{% block page_title %}Prediction result{% endblock %}
+{% block content %}
+
+  {% set category_class = {
+      "At Risk": "badge-risk",
+      "Average": "badge-average",
+      "Good": "badge-good",
+      "Excellent": "badge-excellent"
+  } %}
+  {% set classification_class = {
+      "Fail": "badge-risk",
+      "Pass": "badge-average",
+      "Lower Credit": "badge-average",
+      "Upper Credit": "badge-good",
+      "Distinction": "badge-excellent"
+  } %}
+
+  {% if saved %}
+    <div class="disclaimer" style="background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-strong);">
+      Saved to history for <strong>{{ matric_no }}</strong>. Come back to
+      <a href="{{ url_for('history_lookup') }}">History</a> any time with this matric number and PIN to see it again.
+    </div>
+  {% elif save_error %}
+    <div class="disclaimer">{{ save_error }} This result was not saved.</div>
+  {% endif %}
+
+  <div class="result-card">
+    <div class="score-circle">
+      <div class="score-circle-inner">
+        <span class="score-value" data-target="{{ result.predicted_score }}">{{ result.predicted_score }}</span>
+        <span class="score-max">/ 100</span>
+        {% if result.score_mae %}<span class="score-mae">typically &plusmn;{{ result.score_mae }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="result-details">
+      <p><strong>Classification:</strong>
+        <span class="badge {{ classification_class.get(result.classification, '') }}">{{ result.classification }}</span>
+        <span class="muted">(letter grade {{ result.grade }})</span>
+      </p>
+      <p><strong>Performance category:</strong>
+        <span class="badge {{ category_class.get(result.performance_category, '') }}">{{ result.performance_category }}</span>
+      </p>
+      <p><strong>Predicted outcome:</strong>
+        <span class="badge {{ 'badge-good' if result.pass_fail == 'Pass' else 'badge-risk' }}">{{ result.pass_fail }}</span>
+        ({{ result.pass_probability }}% probability of passing)
+      </p>
+    </div>
+  </div>
+
+  <div class="counsellor-note">
+    <span class="counsellor-note-label">Counsellor's note</span>
+    <p>{{ result.counsellor_note }}</p>
+  </div>
+
+  {% if saved and trend and trend.points|length > 1 %}
+    <div class="trend-card">
+      <h3>Your trend so far</h3>
+      <p class="trend-sub">{{ trend.points|length }} saved checks for {{ matric_no }}.</p>
+      <svg viewBox="0 0 {{ trend.width }} {{ trend.height }}" width="100%">
+        <defs>
+          <linearGradient id="trendLineGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#16a34a"/>
+            <stop offset="100%" stop-color="#4ade80"/>
+          </linearGradient>
+          <linearGradient id="trendAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4ade80" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        {% for gridline in [0, 25, 50, 75, 100] %}
+          {% set gy = trend.baseline_y - (gridline / 100 * (trend.baseline_y - 18)) %}
+          <line class="grid-line" x1="20" y1="{{ gy }}" x2="{{ trend.width - 4 }}" y2="{{ gy }}" stroke-width="1"/>
+          <text x="2" y="{{ gy + 3 }}" font-size="9">{{ gridline }}</text>
+        {% endfor %}
+        <path class="trend-area" d="{{ trend.area_path }}"/>
+        <path class="trend-line" d="{{ trend.line_path }}"/>
+        {% for p in trend.points %}
+          <circle class="{{ 'trend-point-latest' if loop.last else 'trend-point' }}" cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ 5 if loop.last else 3.5 }}">
+            <title>{{ p.date }}: {{ p.score }}</title>
+          </circle>
+        {% endfor %}
+      </svg>
+    </div>
+  {% endif %}
+
+  <div class="score-breakdown">
+    <h2>Where the score comes from</h2>
+    <p class="breakdown-note">The raw sum of your four marks, plus a small model adjustment learned from training data.</p>
+    {% for c in result.score_breakdown.components %}
+      <div class="breakdown-row">
+        <span class="breakdown-label">{{ c.field.replace('_score', '').replace('_', ' ') | title }}</span>
+        <div class="breakdown-track"><div class="breakdown-fill" data-target-width="{{ (c.value / c.max * 100) if c.max else 0 }}" style="width: {{ (c.value / c.max * 100) if c.max else 0 }}%"></div></div>
+        <span class="breakdown-value">{{ c.value }}/{{ c.max }}</span>
+      </div>
+    {% endfor %}
+    <div class="breakdown-total">
+      <span>Raw sum</span>
+      <strong>{{ result.score_breakdown.raw_sum }}</strong>
+    </div>
+    <p class="breakdown-adjustment">
+      Model adjustment: {{ '+' if result.score_breakdown.model_adjustment >= 0 else '' }}{{ result.score_breakdown.model_adjustment }}
+      pts &rarr; predicted score {{ result.predicted_score }}
+    </p>
+  </div>
+
+  <h2>Recommendations</h2>
+  <ul class="recommendations">
+    {% for note in result.recommendations %}
+      <li>{{ note }}</li>
+    {% endfor %}
+  </ul>
+
+  <details class="input-summary">
+    <summary>Input data used for this prediction</summary>
+    <table>
+      {% for field in fields %}
+        <tr><td>{{ field.label }}</td><td>{{ student[field.name] }}</td></tr>
+      {% endfor %}
+    </table>
+  </details>
+
+  <a class="btn-secondary" href="{{ url_for('quick_check') }}">&larr; Check again</a>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Check My Score — YABATECH Performance Predictor{% endblock %}
+{% block page_title %}Check your predicted score{% endblock %}
+{% block page_subtitle %}
+  <p class="subtitle">
+    Enter your four component scores from your result sheet, each on its own mark scheme
+    (exam/60, test/10, assignment/10, practical/20). If you're a lecturer scoring a whole
+    class instead, use <a href="{{ url_for('index') }}">batch upload</a>.
+  </p>
+{% endblock %}
+{% block content %}
+  <form method="post" action="{{ url_for('quick_check_predict') }}" class="predict-form">
+    <div class="form-grid">
+      {% for field in fields %}
+        <div class="form-field">
+          <label for="{{ field.name }}">{{ field.label }}</label>
+          {% if field.help %}<span class="field-help">{{ field.help }}</span>{% endif %}
+          {% if field.type == "select" %}
+            <select id="{{ field.name }}" name="{{ field.name }}" required>
+              {% for option in field.options %}
+                <option value="{{ option }}">{{ option }}</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <input
+              type="number"
+              id="{{ field.name }}"
+              name="{{ field.name }}"
+              min="{{ field.min }}"
+              max="{{ field.max }}"
+              step="{{ field.step or 1 }}"
+              value="{{ field.default }}"
+              required>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 260px));">
+      <div class="form-field">
+        <label for="matric_no">Matric number <span class="muted">(optional)</span></label>
+        <input type="text" id="matric_no" name="matric_no" placeholder="e.g. ND/CS/23/0142">
+      </div>
+      <div class="form-field">
+        <label for="pin">PIN <span class="muted">(only needed to save)</span></label>
+        <input type="password" id="pin" name="pin" placeholder="4+ characters" minlength="4" autocomplete="off">
+        <span class="field-help">Choose one the first time you save this matric number; use the same one every time after — it's what keeps your history private. It can't be recovered if forgotten.</span>
+      </div>
+    </div>
+
+    <label class="checkbox-field">
+      <input type="checkbox" name="save_to_history" id="save_to_history">
+      <span>
+        Save this result to my history
+        <span class="checkbox-help">Requires the matric number and PIN above. Nothing is saved unless this is checked — see the note below.</span>
+      </span>
+    </label>
+
+    <button type="submit" class="btn-primary">See my predicted score</button>
+
+    <p class="privacy-note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+      By default, nothing you enter here is stored — the score is computed and shown to you, then discarded. Checking
+      "save to history" above stores that one result against the matric number you give, so you can look it up again
+      later (see the <a href="{{ url_for('history_lookup') }}">History</a> page). Batch uploads are never stored.
+    </p>
+  </form>
+{% endblock %}

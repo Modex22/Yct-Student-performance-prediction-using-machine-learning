@@ -1,0 +1,7 @@
+<div class="batch-error">
+  <p><strong>Could not process this file.</strong> {{ message }}</p>
+  {% if missing %}
+    <p class="muted">Expected columns include: {{ all_columns|join(', ') }}.</p>
+    <p><a href="{{ url_for('batch_template') }}">Download the CSV template</a> to see the exact format.</p>
+  {% endif %}
+</div>

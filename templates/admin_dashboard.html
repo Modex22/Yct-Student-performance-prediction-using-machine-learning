@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Super Admin Dashboard{% endblock %}
+{% block page_title %}Super Admin dashboard{% endblock %}
+{% block page_subtitle %}<p class="subtitle">Live overview of portal usage, student activity and prediction operations.</p>{% endblock %}
+{% block topbar_extra %}<a class="btn-secondary" href="{{ url_for('logout') }}">Log out</a>{% endblock %}
+{% block content %}
+<style>
+.usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:18px 0}.usage-card{background:var(--card, #111d2d);border:1px solid var(--border,rgba(255,255,255,.09));border-radius:16px;padding:18px}.usage-card span{display:block;color:var(--muted,#9aa8ba);font-size:.83rem}.usage-card strong{display:block;font-size:2rem;margin:8px 0 3px}.usage-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}.usage-bars{display:flex;align-items:end;gap:12px;height:170px;padding:20px 8px 0}.usage-bar{flex:1;min-width:16px;background:linear-gradient(180deg,#35d07f,#13834c);border-radius:7px 7px 2px 2px;position:relative;min-height:3px}.usage-bar small{position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted,#9aa8ba);white-space:nowrap}.usage-bar b{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:11px}.event-pill{display:inline-block;padding:4px 8px;border-radius:20px;background:rgba(39,190,112,.12);font-size:11px}.admin-links{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.admin-links a{ text-decoration:none}@media(max-width:760px){.usage-layout{grid-template-columns:1fr}}
+</style>
+<div class="stats-grid">
+ <div class="stat-card"><span>Student accounts</span><strong>{{ stats.students }}</strong><small>Registered portal users</small></div>
+ <div class="stat-card"><span>Active users today</span><strong>{{ usage.active_today }}</strong><small>Unique users with recorded activity</small></div>
+ <div class="stat-card"><span>Logins today</span><strong>{{ usage.logins_today }}</strong><small>Successful sign-ins</small></div>
+ <div class="stat-card"><span>Total predictions / analyses</span><strong>{{ usage.predictions }}</strong><small>{{ usage.predictions_today }} today</small></div>
+</div>
+<section class="panel data-panel"><div class="panel-heading"><div><span class="eyebrow">USAGE MONITORING</span><h2>Portal activity</h2><p class="subtitle">Prediction requests over the last seven days.</p></div><span class="event-pill">Updated on page load</span></div>
+ <div class="usage-layout"><div><div class="usage-bars">
+ {% set max_count = (usage.daily|map(attribute='count')|max if usage.daily else 1) %}
+ {% for d in usage.daily %}<div class="usage-bar" style="height:{{ (d.count / max_count * 130)|int if max_count else 3 }}px"><b>{{ d.count }}</b><small>{{ d.day[5:] }}</small></div>{% endfor %}
+ {% if not usage.daily %}<p class="subtitle">No prediction activity recorded yet.</p>{% endif %}
+ </div></div>
+ <div class="usage-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="usage-card"><span>Failed predictions</span><strong>{{ usage.failed_predictions }}</strong></div><div class="usage-card"><span>Score submissions</span><strong>{{ stats.submissions }}</strong></div><div class="usage-card"><span>Mean entered average</span><strong>{% if stats.average is not none %}{{ stats.average }}%{% else %}—{% endif %}</strong></div><div class="usage-card"><span>Students with accounts</span><strong>{{ stats.students }}</strong></div></div></div>
+</section>
+<section class="panel data-panel"><div><span class="eyebrow">ADMIN TOOLS</span><h2>Manage the student portal</h2><p class="subtitle">Review accounts, student records and batch analysis.</p></div><div class="admin-links"><a class="btn-primary" href="{{ url_for('admin_students') }}">View student accounts</a><a class="btn-secondary" href="{{ url_for('admin_training') }}">Upload training data / train model</a><a class="btn-secondary" href="{{ url_for('index') }}">Batch upload / analysis</a></div></section>
+<section class="panel data-panel"><div class="panel-heading"><div><h2>Recent activity</h2><p class="subtitle">Latest recorded account and portal events.</p></div></div>
+ {% if usage.recent %}<div class="table-wrap"><table><thead><tr><th>Event</th><th>User</th><th>Matric number</th><th>Time (UTC/server)</th></tr></thead><tbody>{% for ev in usage.recent %}<tr><td><span class="event-pill">{{ ev.event|replace('_',' ')|title }}</span></td><td>{{ ev.full_name }}</td><td>{{ ev.matric_no }}</td><td>{{ ev.created_at }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">No activity recorded yet. New registrations, logins and score submissions will appear here.</div>{% endif %}
+</section>
+<section class="panel data-panel"><div class="panel-heading"><div><h2>Most active students</h2><p class="subtitle">Ranked by prediction and analysis requests.</p></div></div>
+ {% if usage.top_students %}<div class="table-wrap"><table><thead><tr><th>Student</th><th>Matric number</th><th>Requests</th></tr></thead><tbody>{% for st in usage.top_students %}<tr><td>{{ st.full_name }}</td><td>{{ st.matric_no }}</td><td>{{ st.predictions }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">No student usage data yet.</div>{% endif %}
+</section>
+<section class="notice-panel"><strong>ML model status: awaiting paired semester data</strong><p>The portal records usage and first-semester analysis. Genuine second-semester predictions remain unavailable until paired historical outcomes are supplied and evaluated.</p></section>
+{% endblock %}
