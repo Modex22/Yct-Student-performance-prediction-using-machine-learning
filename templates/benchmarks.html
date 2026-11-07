@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Course and study-hours pass rates{% endblock %}
+{% block page_title %}Pass-rate reference{% endblock %}
+{% block page_subtitle %}<p class="subtitle">Course estimates and public study-hours results, summarized separately.</p>{% endblock %}
+{% block content %}
+<div class="notice-panel benchmark-notice"><strong>Two separate datasets</strong><p>The YABATECH workbook contains estimated demonstration scores. The public study-hours results describe a different group of students. These summaries are not joined and do not form a YABATECH prediction model.</p></div>
+<section class="panel data-panel benchmark-panel"><div class="panel-heading"><div><h2>Estimated pass rate by YABATECH course</h2><p class="subtitle">{{ yabatech_source }}. Pass rule: {{ yabatech_pass_rule }}.</p></div><span class="live-pill">Illustrative</span></div>
+<div class="table-wrap"><table><thead><tr><th>Course</th><th>Students</th><th>Passed</th><th>Estimated pass rate</th></tr></thead><tbody>{% for row in course_rates %}<tr><td>{{ row.course }}</td><td>{{ row.students }}</td><td>{{ row.passed }}</td><td><div class="benchmark-rate"><span>{{ '%.1f'|format(row.rate) }}%</span><span class="benchmark-track" aria-hidden="true"><i style="width:{{ row.rate }}%"></i></span></div></td></tr>{% endfor %}</tbody></table></div>
+<p class="benchmark-source">Source workbook values are estimates, not verified student results. Confirm the official pass mark before using these rates.</p></section>
+<section class="panel data-panel benchmark-panel"><div class="panel-heading"><div><h2>Public pass rate by weekly study-hours band</h2><p class="subtitle">{{ public_source }}. Pass rule: {{ public_pass_rule }}.</p></div><span class="live-pill">External reference</span></div>
+<div class="table-wrap"><table><thead><tr><th>Weekly study hours</th><th>Records</th><th>Passed</th><th>Pass rate</th></tr></thead><tbody>{% for row in study_hour_rates %}<tr><td>{{ row.band }}</td><td>{{ row.records }}</td><td>{{ row.passed }}</td><td><div class="benchmark-rate"><span>{{ '%.1f'|format(row.rate) }}%</span><span class="benchmark-track" aria-hidden="true"><i style="width:{{ row.rate }}%"></i></span></div></td></tr>{% endfor %}</tbody></table></div>
+<p class="benchmark-source">Some study-hour groups have very few records. Public course IDs do not map to YABATECH course codes. Use this as a separate research reference only. <a href="https://archive.ics.uci.edu/dataset/856/higher%2Beducation%2Bstudents%2Bperformance%2Bevaluation" target="_blank" rel="noopener">View UCI dataset description</a>.</p></section>
+{% endblock %}

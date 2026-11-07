@@ -16,6 +16,10 @@ from src.accounts import init_db, create_user, authenticate, save_scores, get_sc
 from src.semester_training import train_transition_model, template_csv, predict_second_semester
 from src.current_exam_training import train_current_exam_model, exam_template_csv, predict_current_exam, validate_exam_frame
 from src.accounts import save_lecturer_results, get_lecturer_results
+from src.benchmark_summary import (
+    PUBLIC_PASS_RULE, PUBLIC_SOURCE, PUBLIC_STUDY_HOUR_RATES,
+    YABATECH_COURSE_RATES, YABATECH_PASS_RULE, YABATECH_SOURCE,
+)
 
 app = Flask(__name__)
 app.secret_key = __import__("os").environ.get("SECRET_KEY", "dev-only-change-this-secret-before-deployment")
@@ -437,6 +441,20 @@ def about():
     except FileNotFoundError:
         pass
     return render_template("about.html", metrics=metrics)
+
+
+@app.route("/benchmarks", methods=["GET"])
+def benchmarks():
+    """Show aggregate references without joining the two unrelated datasets."""
+    return render_template(
+        "benchmarks.html",
+        yabatech_source=YABATECH_SOURCE,
+        yabatech_pass_rule=YABATECH_PASS_RULE,
+        course_rates=YABATECH_COURSE_RATES,
+        public_source=PUBLIC_SOURCE,
+        public_pass_rule=PUBLIC_PASS_RULE,
+        study_hour_rates=PUBLIC_STUDY_HOUR_RATES,
+    )
 
 
 @app.route("/figures/<path:filename>", methods=["GET"])

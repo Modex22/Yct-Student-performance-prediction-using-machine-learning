@@ -200,6 +200,15 @@ trained the separate paired-semester model; otherwise the page explains
 that the model is unavailable. Admin and lecturer dashboards, uploads, and
 training remain behind their existing role-protected logins.
 
+### Pass-rate reference
+
+Open `/benchmarks` from the public menu to compare estimated pass rates by
+YABATECH course with public pass rates grouped by reported study hours.
+These are separate aggregate summaries, not joined student records and not
+a combined prediction model. The YABATECH workbook values are estimated
+demonstration scores. The public UCI dataset has 145 records and grouped
+weekly study-hour responses; small groups make its rates descriptive only.
+
 ## Deploying it publicly
 
 **Not Vercel** — this app's dependencies (numpy + pandas + scipy + scikit-learn)
