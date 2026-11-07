@@ -76,6 +76,42 @@ def index():
     return render_template("batch_upload.html", stats=admin_stats(), user=user)
 
 
+@app.route("/demo", methods=["GET", "POST"])
+def guest_demo():
+    """Account-free prediction sandbox; never reads or saves student records."""
+    result = None
+    error = None
+    next_prediction = None
+    if request.method == "POST":
+        action = request.form.get("action", "exam")
+        course = (request.form.get("course") or "DEMO COURSE").strip().upper()[:32]
+        try:
+            if action == "next_semester":
+                score = float(request.form.get("first_semester_score", ""))
+                if not 0 <= score <= 100:
+                    raise ValueError("First-semester score must be between 0 and 100.")
+                next_prediction = predict_second_semester(course, score)
+            else:
+                study = float(request.form.get("study_time_hours", ""))
+                test = float(request.form.get("test_score", ""))
+                practical = float(request.form.get("practical_score", ""))
+                assignment = float(request.form.get("assignment_score", ""))
+                if not course:
+                    raise ValueError("Enter a course code.")
+                if not 0 <= study <= 80:
+                    raise ValueError("Study time must be between 0 and 80 hours per week.")
+                if any(not 0 <= value <= 100 for value in (test, practical, assignment)):
+                    raise ValueError("Scores must be between 0 and 100.")
+                exam = predict_current_exam(study, test, practical)
+                result = {"course": course, "study": study, "test": test,
+                          "practical": practical, "assignment": assignment,
+                          "exam": exam, "course_estimate": round((assignment + practical + test + exam) / 4, 1)}
+        except ValueError as exc:
+            error = str(exc)
+    return render_template("guest_demo.html", result=result, error=error,
+                           next_prediction=next_prediction)
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":

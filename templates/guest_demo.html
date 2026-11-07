@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Guest demo · YABATECH Performance Predictor{% endblock %}
+{% block page_title %}Student dashboard demo{% endblock %}
+{% block page_subtitle %}<p class="subtitle">Try the prediction form without an account. Nothing you enter is saved or linked to a student.</p>{% endblock %}
+{% block content %}
+<div class="notice-panel"><strong>Demo mode</strong><p>Use made-up values only. Results are estimates from the available model and are not official grades. This page does not display student accounts, saved scores or lecturer-published records.</p></div>
+{% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
+<section class="panel data-panel"><h2>Current exam estimate</h2><p class="subtitle">The exam model uses study time, practical score and test score. Enter an assignment score to show the indicative overall estimate.</p>
+<form method="post" class="predict-form"><input type="hidden" name="action" value="exam"><div class="form-grid">
+<div class="form-field"><label for="course">Course code</label><input id="course" name="course" placeholder="DEMO 411" value="{{ request.form.get('course','') }}"></div>
+<div class="form-field"><label for="study">Study time (hours per week)</label><input id="study" name="study_time_hours" type="number" min="0" max="80" step="0.5" required value="{{ request.form.get('study_time_hours','8') }}"></div>
+<div class="form-field"><label for="test">Test score (0–100)</label><input id="test" name="test_score" type="number" min="0" max="100" step="0.1" required value="{{ request.form.get('test_score','70') }}"></div>
+<div class="form-field"><label for="practical">Practical score (0–100)</label><input id="practical" name="practical_score" type="number" min="0" max="100" step="0.1" required value="{{ request.form.get('practical_score','75') }}"></div>
+<div class="form-field"><label for="assignment">Assignment score (0–100)</label><input id="assignment" name="assignment_score" type="number" min="0" max="100" step="0.1" required value="{{ request.form.get('assignment_score','80') }}"></div>
+</div><button class="btn-primary" type="submit">Estimate exam score</button></form></section>
+{% if result %}<section class="stats-grid prediction-result"><div class="stat-card"><span>Demo exam estimate</span><strong>{{ result.exam }}%</strong><small>{{ result.course }}</small></div><div class="stat-card"><span>Indicative course estimate</span><strong>{{ result.course_estimate }}%</strong><small>Average of entered assessment values and the exam estimate</small></div></section>
+<section class="panel data-panel"><h2>Next-semester estimate</h2><p class="subtitle">This option works only after an administrator has trained a model with paired first- and second-semester records.</p><form method="post" class="predict-form"><input type="hidden" name="action" value="next_semester"><input type="hidden" name="course" value="{{ result.course }}"><input type="hidden" name="first_semester_score" value="{{ result.course_estimate }}"><button class="btn-secondary" type="submit">Try next-semester estimate</button></form></section>{% endif %}
+{% if next_prediction is not none %}<section class="stat-card"><span>Demo second-semester estimate</span><strong>{{ next_prediction }}%</strong><small>Illustrative estimate only; not an official result.</small></section>{% endif %}
+{% endblock %}

@@ -132,6 +132,33 @@ server-side, consistent with how the rest of the app already worked.
 
 ## Setup
 
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+If `py` is unavailable, install Python 3.11 or later and enable the Python
+launcher during installation.
+
+For a local deployment, configure the account credentials before starting
+the app. PowerShell example (replace the sample values):
+
+```powershell
+$env:SECRET_KEY = "replace-with-a-long-random-secret"
+$env:ADMIN_USERNAME = "admin"
+$env:ADMIN_PASSWORD = "replace-with-a-strong-admin-password"
+$env:LECTURER_USERNAME = "lecturer"
+$env:LECTURER_PASSWORD = "replace-with-a-strong-lecturer-password"
+```
+
+Do not commit credentials or real student spreadsheets to source control.
+The guest demo does not require an account.
+
+macOS/Linux:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -160,6 +187,18 @@ Click "Try an example roster" to see the full flow without your own file,
 or download the CSV template and fill in a real class list. `/quick-check`
 lets one student check their own score, and `/about` has model metrics and
 charts.
+
+### Student guest demo
+
+Open `http://localhost:5000/demo` or choose **Try guest demo** on the home
+page. No student account is needed. Enter made-up values to try the exam
+estimate; the form does not query student accounts or saved scores and does
+not save submissions. The page labels output as a demo estimate. Exam
+predictions require the lecturer to have trained the exam model. A
+second-semester estimate is available only after the administrator has
+trained the separate paired-semester model; otherwise the page explains
+that the model is unavailable. Admin and lecturer dashboards, uploads, and
+training remain behind their existing role-protected logins.
 
 ## Deploying it publicly
 
@@ -264,7 +303,7 @@ policy once known.
 
 ## Student login portal update (November 2026)
 
-This version adds student registration/login, a student dashboard, a first-semester score-entry form for the 16 course codes in the supplied workbook, saved submission history, and an administrator dashboard. Passwords are stored as Werkzeug password hashes in `instance/accounts.db`; student score submissions are stored per account.
+This version adds student registration/login, a student dashboard, a first-semester score-entry form for the 16 course codes in the supplied workbook, saved submission history, and an administrator dashboard. Passwords are stored as Werkzeug password hashes in `instance/accounts.db`; student score submissions are stored per account. The guest-demo ZIP excludes the supplied workbook and any local account database; keep real or student-level source files out of shared archives.
 
 ### Important machine-learning limitation
 
