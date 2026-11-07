@@ -77,3 +77,10 @@ def train_transition_model(df):
 
 def template_csv():
     return 'student_id,course,first_semester_score,second_semester_score\nSTU001,SWD 321,75,81\nSTU002,SWD 321,60,66\n'
+
+def predict_second_semester(course, first_semester_score):
+    if not os.path.exists(MODEL_PATH):
+        raise ValueError('A paired first- and second-semester training dataset has not been uploaded by the administrator yet.')
+    model=joblib.load(MODEL_PATH)
+    value=float(model.predict(pd.DataFrame([{'course':str(course).strip().upper(),'first_semester_score':float(first_semester_score)}]))[0])
+    return round(max(0.0,min(100.0,value)),1)

@@ -23,11 +23,21 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, prediction_type TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'success', duration_ms REAL, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS lecturer_course_results (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, matric_no TEXT NOT NULL, course TEXT NOT NULL,
+          study_time_hours REAL, assignment_score REAL, practical_score REAL, test_score REAL, exam_score REAL,
+          uploaded_by INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(matric_no, course))''')
         c.execute('''CREATE TABLE IF NOT EXISTS semester_scores (
           id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
           scores_json TEXT NOT NULL, average REAL NOT NULL,
           created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY(user_id) REFERENCES users(id))''')
+        lecturer_user=os.getenv('LECTURER_USERNAME','lecturer').strip().lower()
+        lecturer_pass=os.getenv('LECTURER_PASSWORD','')
+        if lecturer_pass and not c.execute('SELECT 1 FROM users WHERE matric_no=?',(lecturer_user,)).fetchone():
+            c.execute('INSERT INTO users(matric_no,full_name,password_hash,role) VALUES(?,?,?,?)',
+                      (lecturer_user,'Lecturer',generate_password_hash(lecturer_pass),'lecturer'))
         admin_user=os.getenv('ADMIN_USERNAME','admin').strip().lower()
         admin_pass=os.getenv('ADMIN_PASSWORD','')
         if admin_pass and not c.execute('SELECT 1 FROM users WHERE matric_no=?',(admin_user,)).fetchone():
@@ -112,3 +122,23 @@ def admin_usage():
             'predictions_today':predictions_today,'failed_predictions':failed_predictions,
             'daily':[dict(x) for x in daily],'recent':[dict(x) for x in recent],
             'top_students':[dict(x) for x in top]}
+
+
+def save_lecturer_results(rows, lecturer_id):
+    with connect() as c:
+        for r in rows:
+            c.execute("""INSERT INTO lecturer_course_results
+              (matric_no,course,study_time_hours,assignment_score,practical_score,test_score,exam_score,uploaded_by)
+              VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(matric_no,course) DO UPDATE SET
+              study_time_hours=excluded.study_time_hours,assignment_score=excluded.assignment_score,
+              practical_score=excluded.practical_score,test_score=excluded.test_score,exam_score=excluded.exam_score,
+              uploaded_by=excluded.uploaded_by,created_at=CURRENT_TIMESTAMP""",
+              (r['matric_no'],r['course'],r.get('study_time_hours'),r.get('assignment_score'),r.get('practical_score'),r.get('test_score'),r.get('exam_score'),lecturer_id))
+
+def get_lecturer_results(matric_no=None):
+    with connect() as c:
+        if matric_no:
+            rows=c.execute('SELECT * FROM lecturer_course_results WHERE upper(matric_no)=upper(?) ORDER BY course',(matric_no,)).fetchall()
+        else:
+            rows=c.execute('SELECT * FROM lecturer_course_results ORDER BY created_at DESC,matric_no,course LIMIT 500').fetchall()
+    return [dict(r) for r in rows]

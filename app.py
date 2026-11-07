@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import io
 import pandas as pd
 
@@ -12,7 +13,9 @@ from src.config import FEATURE_COLUMNS, FIGURES_DIR, METRICS_PATH
 from src.history import WrongPin, build_trend_chart, delete_history, get_history, save_entry
 from src.predict import predict_performance
 from src.accounts import init_db, create_user, authenticate, save_scores, get_scores, admin_stats, get_students, log_activity, log_prediction, admin_usage
-from src.semester_training import train_transition_model, template_csv
+from src.semester_training import train_transition_model, template_csv, predict_second_semester
+from src.current_exam_training import train_current_exam_model, exam_template_csv, predict_current_exam, validate_exam_frame
+from src.accounts import save_lecturer_results, get_lecturer_results
 
 app = Flask(__name__)
 app.secret_key = __import__("os").environ.get("SECRET_KEY", "dev-only-change-this-secret-before-deployment")
@@ -68,6 +71,8 @@ def index():
         return render_template("landing.html")
     if user.get("role") == "student":
         return redirect(url_for("student_dashboard"))
+    if user.get("role") == "lecturer":
+        return redirect(url_for("lecturer_dashboard"))
     return render_template("batch_upload.html", stats=admin_stats(), user=user)
 
 
@@ -97,7 +102,9 @@ def login():
             return render_template("auth.html", title="Log in", error="Incorrect username/matric number or password."), 401
         session.clear(); session["user"]={"id":user["id"],"matric_no":user["matric_no"],"full_name":user["full_name"],"role":user["role"]}
         log_activity(user["id"], "login_success", {"role": user["role"]})
-        return redirect(url_for("index"))
+        if user["role"] == "lecturer": return redirect(url_for("lecturer_dashboard"))
+        if user["role"] == "admin": return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("student_dashboard"))
     return render_template("auth.html", title="Log in")
 
 @app.route("/logout")
@@ -109,7 +116,7 @@ def logout():
 @app.route("/student")
 @role_required("student")
 def student_dashboard():
-    user=current_user(); return render_template("student_dashboard.html",user=user,entries=get_scores(user["id"]))
+    user=current_user(); return render_template("student_dashboard.html",user=user,entries=get_scores(user["id"]), published_results=get_lecturer_results(user["matric_no"]))
 
 @app.route("/student/scores", methods=["GET","POST"])
 @role_required("student")
@@ -135,6 +142,85 @@ def student_scores():
             category="Excellent" if average>=70 else "Good" if average>=60 else "Average" if average>=50 else "Needs support"
             return render_template("student_analysis.html",scores=scores,average=average,category=category)
     return render_template("student_scores.html",courses=COURSES,values=values,error=error)
+
+@app.route("/student/course-predict", methods=["GET", "POST"])
+@role_required("student")
+def student_course_predict():
+    result = None; error = None
+    if request.method == "POST":
+        try:
+            course=(request.form.get("course") or "").strip().upper()
+            study=float(request.form.get("study_time_hours", "")); assignment=float(request.form.get("assignment_score", "")); practical=float(request.form.get("practical_score", "")); test=float(request.form.get("test_score", ""))
+            if not course: raise ValueError("Enter the course code.")
+            if not 0 <= study <= 80: raise ValueError("Study time must be between 0 and 80 hours per week.")
+            if any(not 0 <= x <= 100 for x in [assignment,practical,test]): raise ValueError("Assignment, practical and test scores must be between 0 and 100.")
+            exam=predict_current_exam(study,test,practical)
+            # A transparent course estimate; assignment is included in the coursework average, not the exam model.
+            course_estimate=round((assignment+practical+test+exam)/4,1)
+            result={"course":course,"exam":exam,"course_estimate":course_estimate,"study":study,"assignment":assignment,"practical":practical,"test":test}
+            log_prediction(current_user()["id"],"current_exam_estimate"); log_activity(current_user()["id"],"current_exam_estimate",{"course":course})
+        except ValueError as exc: error=str(exc)
+    return render_template("student_course_predict.html",result=result,error=error)
+
+@app.route("/student/next-semester", methods=["POST"])
+@role_required("student")
+def student_next_semester():
+    try:
+        course=(request.form.get("course") or "").strip().upper(); score=float(request.form.get("first_semester_score", ""))
+        if not course or not 0 <= score <= 100: raise ValueError("Enter a course and a first-semester score from 0 to 100.")
+        prediction=predict_second_semester(course,score)
+        log_prediction(current_user()["id"],"next_semester_course_prediction")
+        return render_template("next_semester_result.html",course=course,score=score,prediction=prediction)
+    except ValueError as exc:
+        return render_template("student_course_predict.html",error=str(exc),result=None),400
+
+@app.route("/lecturer/login", methods=["GET","POST"])
+def lecturer_login():
+    if request.method == "POST":
+        user=authenticate(request.form.get("username", ""),request.form.get("password", ""))
+        if not user or user.get("role") != "lecturer":
+            return render_template("lecturer_login.html",error="Invalid lecturer username or password."),401
+        session.clear(); session["user"]={"id":user["id"],"matric_no":user["matric_no"],"full_name":user["full_name"],"role":user["role"]}
+        log_activity(user["id"],"lecturer_login"); return redirect(url_for("lecturer_dashboard"))
+    return render_template("lecturer_login.html")
+
+@app.route("/lecturer")
+@role_required("lecturer")
+def lecturer_dashboard():
+    return render_template("lecturer_dashboard.html",user=current_user(),results=get_lecturer_results())
+
+@app.route("/lecturer/upload",methods=["POST"])
+@role_required("lecturer")
+def lecturer_upload():
+    upload=request.files.get("spreadsheet")
+    if not upload or not upload.filename: flash("Choose a CSV or Excel spreadsheet first.","error"); return redirect(url_for("lecturer_dashboard"))
+    try:
+        filename=upload.filename.lower(); data=upload.read()
+        if filename.endswith('.csv'): frame=pd.read_csv(io.BytesIO(data))
+        elif filename.endswith(('.xlsx','.xlsm')): frame=pd.read_excel(io.BytesIO(data),engine='openpyxl')
+        else: raise ValueError("Upload a CSV or XLSX spreadsheet.")
+        # Accept matric_no as the student identifier used by the portal.
+        frame.columns=[str(c).strip().lower().replace(' ','_') for c in frame.columns]
+        if 'matric_no' in frame.columns and 'student_id' not in frame.columns: frame=frame.rename(columns={'matric_no':'student_id'})
+        frame=validate_exam_frame(frame)
+        rows=[]
+        for _,r in frame.iterrows(): rows.append({'matric_no':r.student_id,'course':r.course,'study_time_hours':float(r.study_time_hours),'assignment_score':None,'practical_score':float(r.practical_score),'test_score':float(r.test_score),'exam_score':float(r.exam_score)})
+        # Preserve assignment scores when supplied, although they are not an input to the exam estimator.
+        raw=pd.read_csv(io.BytesIO(data)) if filename.endswith('.csv') else pd.read_excel(io.BytesIO(data),engine='openpyxl')
+        raw.columns=[str(c).strip().lower().replace(' ','_') for c in raw.columns]
+        if 'assignment_score' in raw.columns:
+            for row,(_,rr) in zip(rows,raw.iterrows()): row['assignment_score']=float(rr['assignment_score']) if pd.notna(rr['assignment_score']) else None
+        metrics=train_current_exam_model(frame)
+        save_lecturer_results(rows,current_user()['id'])
+        log_activity(current_user()['id'],'lecturer_spreadsheet_uploaded',{'rows':len(rows),'students':metrics['students']})
+        flash(f"Uploaded {len(rows)} course records and trained the exam estimator using {metrics['students']} students.","success")
+    except Exception as exc: flash(str(exc),"error")
+    return redirect(url_for("lecturer_dashboard"))
+
+@app.route("/lecturer/template")
+@role_required("lecturer")
+def lecturer_template():
+    return Response(exam_template_csv(),mimetype="text/csv",headers={"Content-Disposition":"attachment; filename=lecturer_assessment_template.csv"})
 
 @app.route("/admin")
 @role_required("admin")

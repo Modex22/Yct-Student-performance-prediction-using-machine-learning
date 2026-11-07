@@ -338,3 +338,34 @@ The training upload accepts CSV or XLSX with exactly these required fields (addi
 Download the example from the admin page. Each student/course pair must be unique, values cannot be blank, and at least 10 distinct students are required. The evaluation holds out whole students (rather than random rows) to reduce leakage. It compares three regressors using MAE, RMSE and R², then saves a separate artifact at `models/semester_transition_model.joblib` and metrics at `models/semester_transition_metrics.json`.
 
 **Important:** this training page creates a separate first-to-second-semester model. It does not activate second-semester predictions in the student interface yet. That integration should only be done after validating real paired YABATECH records. The included estimated/demo workbook is not suitable for this training task. Do not claim its demonstration metrics as real model performance.
+
+
+## Student, lecturer and mobile portal updates
+
+### Role access
+- Students register and sign in at `/login`.
+- Lecturers sign in separately at `/lecturer/login`. Their account is created on startup when `LECTURER_USERNAME` and `LECTURER_PASSWORD` are configured.
+- Administrators sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator-only training and analytics routes remain protected by role checks.
+
+Set these Railway variables (use strong private values):
+```env
+SECRET_KEY=your-long-random-secret
+ADMIN_USERNAME=modexadmin
+ADMIN_PASSWORD=your-strong-admin-password
+LECTURER_USERNAME=lecturer
+LECTURER_PASSWORD=your-strong-lecturer-password
+```
+
+### Lecturer assessment spreadsheet
+The lecturer dashboard accepts CSV/XLSX files with one row per student per course. Required columns are:
+`student_id` (or `matric_no`), `course`, `study_time_hours`, `test_score`, `practical_score`, and `exam_score`. `assignment_score` is optional and is shown to the matching student. The uploader stores the course results and trains the current-exam estimator. At least 10 distinct students with complete, real historical data are required.
+
+The exam estimator uses only `study_time_hours`, `test_score`, and `practical_score` as requested; assignment score is collected for the student course profile but is not a model input. Students can see lecturer-published results when the spreadsheet matric number matches their account matric number.
+
+### Student predictors
+The student course predictor collects course, weekly study hours, assignment, practical and test scores. It can estimate the current exam score after a lecturer has trained the exam model. It also offers a second-semester estimate only after an administrator has uploaded paired historical first- and second-semester data through **Admin → Model Training**. The second-semester model uses course and first-semester course score.
+
+The displayed course estimate is an indicative simple average of the entered assessment components and predicted exam score, not an official weighted course total. Replace this with the department's official assessment weighting if confirmed. Predictions are estimates, not guaranteed grades.
+
+### Mobile layout
+The sidebar navigation collapses into a dropdown menu on small screens. Student, lecturer and admin pages use responsive grids and scrollable tables.
